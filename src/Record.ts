@@ -1,5 +1,9 @@
-import p5 from "p5";
-import { AudioAnalysis } from "./types";
+import p5, { Vector } from "p5";
+import {
+  AudioAnalysis,
+  processRawAnalysis,
+  RawAudioAnalysis,
+} from "./AudioAnalysis";
 
 interface RecordOptions {
   /** Moves the centerpoint  of the spiral outward from the origin */
@@ -22,12 +26,17 @@ export class Record {
     rotations: 20,
   };
 
-  private readonly rotations: number;
+  private readonly analysis: AudioAnalysis;
   private readonly a: number;
   private readonly b: number;
   private readonly thetaStart: number;
 
-  constructor(analysis: AudioAnalysis, options: RecordOptions = {}) {
+  private readonly thetaEnd: number;
+  private readonly arcLengthStart: number;
+  private readonly arcLengthEnd: number;
+  private readonly totalArcLength: number;
+
+  constructor(analysis: RawAudioAnalysis, options: RecordOptions = {}) {
     const { a, b, thetaStart, rotations } = {
       ...Record.DEFAULT_OPTIONS,
       ...options,
@@ -36,7 +45,46 @@ export class Record {
     this.a = a;
     this.b = b;
     this.thetaStart = thetaStart;
-    this.rotations = rotations;
+    this.analysis = processRawAnalysis(analysis);
+
+    this.thetaEnd = rotations * 2 * Math.PI;
+    this.arcLengthStart = this.arcLength(this.thetaStart);
+    this.arcLengthEnd = this.arcLength(this.thetaEnd);
+    this.totalArcLength = this.arcLengthEnd - this.arcLengthStart;
+
+    console.log(this);
+  }
+
+  public drawPct(p: p5, pct: number) {
+    let theta = this.thetaStart;
+
+    p.background("gray");
+    p.stroke("white");
+    p.strokeWeight(1);
+
+    while (theta < this.thetaEnd) {
+      const start = this.getPointVector(theta);
+      theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
+
+      const end = this.getPointVector(theta);
+      p.line(start.x, start.y, end.x, end.y);
+    }
+
+    p.stroke("purple");
+    p.strokeWeight(4);
+
+    for (const beat of this.analysis.beats) {
+      const t = this.findThetaPct(beat.progressPct);
+      const v = this.getPointVector(t);
+
+      if (beat.progressPct > pct) {
+        p.strokeWeight(4);
+      } else {
+        p.strokeWeight(8);
+      }
+
+      p.point(v.x, v.y);
+    }
   }
 
   public draw(p: p5) {
@@ -45,17 +93,31 @@ export class Record {
     p.stroke("black");
     p.strokeWeight(1);
 
-    while (theta < this.rotations * 2 * Math.PI) {
-      const start = p.createVector(Math.cos(theta), Math.sin(theta));
-      start.mult(this.getDistance(theta));
-
+    while (theta < this.thetaEnd) {
+      const start = this.getPointVector(theta);
       theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
 
-      const end = p.createVector(Math.cos(theta), Math.sin(theta));
-      end.mult(this.getDistance(theta));
-
+      const end = this.getPointVector(theta);
       p.line(start.x, start.y, end.x, end.y);
     }
+
+    p.stroke("purple");
+    p.strokeWeight(4);
+
+    for (const beat of this.analysis.beats) {
+      const t = this.findThetaPct(beat.progressPct);
+      const v = this.getPointVector(t);
+
+      p.point(v.x, v.y);
+    }
+  }
+
+  private getPointVector(theta: number): Vector {
+    const v = new Vector();
+    v.set(Math.cos(theta), Math.sin(theta));
+    v.mult(this.getDistance(theta));
+
+    return v;
   }
 
   private arcLength(t: number) {
@@ -75,6 +137,13 @@ export class Record {
     return this.a + this.b * t;
   }
 
+  private findThetaPct(percentage: number) {
+    const pctArcLength = this.totalArcLength * percentage;
+    const targetArcLength = this.arcLengthStart + pctArcLength;
+
+    return this.findTheta(targetArcLength);
+  }
+
   /**
    * Numerical approximation for the inverse of the `arcLength` function, that is,
    * given an arc length, find the theta value that would produce that value.
@@ -82,7 +151,7 @@ export class Record {
   private findTheta(targetArcLength: number, tolerance: number = 0.1) {
     let low = 0;
     // TODO: Replace hardcoded value
-    let high = 2 * Math.PI * this.rotations;
+    let high = this.thetaEnd;
 
     let t = high / 2;
 

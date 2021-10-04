@@ -1,123 +1,95 @@
 import p5 from "p5";
+import axios from "axios";
+import { getWebApiToken } from "./auth";
 import { Record } from "./Record";
 import ado from "./songs/ado.json";
+import industry from "./songs/industry.json";
+import { RawAudioAnalysis } from "./AudioAnalysis";
 
 const containerElement = document.getElementById("p5-container") ?? undefined;
 
 const C_WIDTH = 800;
 const C_HEIGHT = 800;
 
-const BEATS = 400;
+const ELLIOT = "spotify:track:0Ziohm1Ku8E2yUDYoclfhO";
+const ADO = "spotify:track:7z6qHGEKxRtwtYym2epV7l";
 
-const getDist = (theta: number) => {
-  const a = 1;
-  const b = Math.PI;
-
-  return a + b * theta;
-};
-
-const arcLength = (t: number) => {
-  const sq = Math.sqrt(Math.pow(t, 2) + 1) * t;
-  return (1 / 2) * 1 * (sq + Math.asinh(t));
-};
-
-const rotSpeed = (t: number) => {
-  const speed = 20;
-
-  return speed / (2 * Math.PI * t);
-};
-
-const findT = (targetL: number, tolerance: number = 0.1) => {
-  let low = 0;
-  let high = 2 * Math.PI * 20;
-
-  let t = high / 2;
-
-  for (let i = 0; i < 10_000; i++) {
-    const currentL = arcLength(t);
-    if (Math.abs(currentL - targetL) < tolerance) break;
-
-    // current value is bigger than we want to find - narrow search down
-    if (currentL > targetL) {
-      high = t;
-
-      const interval = high - low;
-      t = low + interval / 2;
-    } else {
-      // current value is smaller than we want to find - narrow search up
-      low = t;
-      const interval = high - low;
-      t = low + interval / 2;
+const getAnalysis = async (token: string, uri: string) => {
+  const id = uri.split(":")[2];
+  const { data } = await axios.get<RawAudioAnalysis>(
+    `https://api.spotify.com/v1/audio-analysis/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     }
-  }
-  return t;
+  );
+
+  return data;
 };
 
-// @ts-ignore
-window.findT = findT;
+const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const getProgress = async (token: string) => {
+  const { data } = await axios.get<{
+    progress_ms: number;
+    item: { duration_ms: number; uri: string };
+  }>("https://api.spotify.com/v1/me/player/currently-playing", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-const sketch = (p: p5) => {
-  const totalArcLength = arcLength(2 * Math.PI * 20);
-  const thetaStart = Math.PI * 8;
-  const arcLengthStart = arcLength(thetaStart);
-
-  let theta = thetaStart;
-
-  p.setup = () => {
-    p.createCanvas(C_WIDTH, C_HEIGHT);
-    // @ts-ignore
-    window.rotSpeed = rotSpeed;
-    // @ts-ignore
-    window.arcLength = arcLength;
-  };
-
-  p.draw = () => {
-    p.stroke("black");
-    p.strokeWeight(1);
-    p.translate(C_WIDTH / 2, C_HEIGHT / 2);
-
-    const v1 = p.createVector(p.cos(theta), p.sin(theta));
-    v1.mult(getDist(theta));
-
-    theta += Math.PI / 30;
-    // theta += rotSpeed(theta);
-
-    const v2 = p.createVector(p.cos(theta), p.sin(theta));
-    v2.mult(getDist(theta));
-
-    p.line(v1.x, v1.y, v2.x, v2.y);
-
-    p.stroke("purple");
-    p.strokeWeight(5);
-
-    // for (
-    //   let i = arcLengthStart;
-    //   i < totalArcLength;
-    //   i += (totalArcLength - arcLengthStart) / ado.beats.length
-    // ) {
-    //   console.log(i);
-    //   const t = findT(i);
-    //   const v = p.createVector(p.cos(t), p.sin(t));
-    //   v.mult(getDist(t));
-    //   p.point(v.x, v.y);
-    // }
-
-    if (theta > 2 * Math.PI * 20) p.noLoop();
+  console.log(data);
+  return {
+    progressMs: data.progress_ms,
+    durationMs: data.item.duration_ms,
+    uri: data.item.uri,
   };
 };
 
-const sketch2 = (p: p5) => {
-  const rec = new Record(ado);
+const main = async () => {
+  const token = await getWebApiToken();
 
-  p.setup = () => {
-    p.createCanvas(C_WIDTH, C_HEIGHT);
+  // const uri = ELLIOT;
+  // const analysis = await getAnalysis(token, uri);
+
+  // await axios.put(
+  //   "https://api.spotify.com/v1/me/player/play",
+  //   {
+  //     uris: [uri],
+  //   },
+  //   { headers: { Authorization: `Bearer ${token}` } }
+  // );
+  await wait(200);
+
+  const { progressMs, durationMs, uri } = await getProgress(token);
+
+  const startTimestamp = new Date().getTime();
+
+  let progressPct = progressMs / durationMs;
+
+  setInterval(() => {
+    const now = new Date().getTime();
+    const diff = now - startTimestamp;
+
+    progressPct = (progressMs + diff) / durationMs;
+  }, 20);
+
+  const analysis = await getAnalysis(token, uri);
+  const sketch = (p: p5) => {
+    const rec = new Record(analysis);
+
+    p.setup = () => {
+      p.createCanvas(C_WIDTH, C_HEIGHT);
+    };
+
+    p.draw = () => {
+      p.translate(C_WIDTH / 2, C_HEIGHT / 2);
+      rec.drawPct(p, progressPct);
+    };
   };
 
-  p.draw = () => {
-    p.background("white");
-    p.translate(C_WIDTH / 2, C_HEIGHT / 2);
-    rec.draw(p);
-  };
+  new p5(sketch, containerElement);
 };
 
-new p5(sketch2, containerElement);
+main();
