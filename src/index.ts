@@ -66,14 +66,7 @@ const main = async () => {
 
   const startTimestamp = new Date().getTime();
 
-  let progressPct = progressMs / durationMs;
-
-  setInterval(() => {
-    const now = new Date().getTime();
-    const diff = now - startTimestamp;
-
-    progressPct = (progressMs + diff) / durationMs;
-  }, 20);
+  let progressPct = (progressMs + 20) / durationMs;
 
   const analysis = await getAnalysis(token, uri);
   const sketch = (p: p5) => {
@@ -81,9 +74,15 @@ const main = async () => {
 
     p.setup = () => {
       p.createCanvas(C_WIDTH, C_HEIGHT);
+      p.colorMode(p.HSB);
     };
 
     p.draw = () => {
+      const now = new Date().getTime();
+      const diff = now - startTimestamp;
+
+      progressPct = (progressMs + diff) / durationMs;
+
       p.translate(C_WIDTH / 2, C_HEIGHT / 2);
       rec.drawPct(p, progressPct);
     };

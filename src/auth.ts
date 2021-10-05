@@ -16,16 +16,18 @@ export const getWebApiToken = async (): Promise<string> => {
     if (!token) throw new Error("something went wrong");
 
     window.localStorage.setItem("token", token);
-    window.location.replace("http://localhost:8080");
+    window.history.replaceState("", document.title, window.location.pathname);
 
-    return "";
+    return token;
   }
 
   const params = new URLSearchParams();
 
+  const { protocol, host, pathname } = window.location;
+
   params.set("client_id", CLIENT_ID);
   params.set("response_type", "token");
-  params.set("redirect_uri", "http://localhost:8080");
+  params.set("redirect_uri", `${protocol}//${host}${pathname}`);
   params.set("scope", "user-modify-playback-state user-read-currently-playing");
 
   window.location.replace(`${AUTH_URL}?${params.toString()}`);

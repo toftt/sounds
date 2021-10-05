@@ -36,6 +36,8 @@ export class Record {
   private readonly arcLengthEnd: number;
   private readonly totalArcLength: number;
 
+  private scale: number = 1;
+
   constructor(analysis: RawAudioAnalysis, options: RecordOptions = {}) {
     const { a, b, thetaStart, rotations } = {
       ...Record.DEFAULT_OPTIONS,
@@ -51,26 +53,39 @@ export class Record {
     this.arcLengthStart = this.arcLength(this.thetaStart);
     this.arcLengthEnd = this.arcLength(this.thetaEnd);
     this.totalArcLength = this.arcLengthEnd - this.arcLengthStart;
-
-    console.log(this);
   }
 
   public drawPct(p: p5, pct: number) {
+    this.pulse(p, pct);
     let theta = this.thetaStart;
 
-    p.background("gray");
-    p.stroke("white");
-    p.strokeWeight(1);
+    p.rotate(pct * Math.PI * 4);
+    p.background("white");
 
+    // p.strokeWeight(10);
+    // p.stroke(this.getCurrentSectionColor(this.thetaStart * Math.PI));
+    // const dist = this.getDistance(this.thetaStart + 8 * Math.PI);
+    // p.circle(0, 0, dist);
+
+    p.strokeWeight(1);
     while (theta < this.thetaEnd) {
       const start = this.getPointVector(theta);
       theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
 
       const end = this.getPointVector(theta);
+
+      const sectionColor = this.getCurrentSectionColor(theta);
+      p.stroke(sectionColor, 150, 150);
+
+      if (this.getProgressPct(theta) > pct) {
+        p.strokeWeight(1);
+      } else {
+        p.strokeWeight(10);
+      }
       p.line(start.x, start.y, end.x, end.y);
     }
 
-    p.stroke("purple");
+    p.stroke("black");
     p.strokeWeight(4);
 
     for (const beat of this.analysis.beats) {
@@ -85,37 +100,95 @@ export class Record {
 
       p.point(v.x, v.y);
     }
-  }
 
-  public draw(p: p5) {
-    let theta = this.thetaStart;
+    p.stroke("white");
+    for (const bar of this.analysis.bars) {
+      const t = this.findThetaPct(bar.progressPct);
+      const v = this.getPointVector(t);
 
-    p.stroke("black");
-    p.strokeWeight(1);
+      if (bar.progressPct > pct) {
+        p.strokeWeight(2);
+      } else {
+        p.strokeWeight(5);
+      }
 
-    while (theta < this.thetaEnd) {
-      const start = this.getPointVector(theta);
-      theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
-
-      const end = this.getPointVector(theta);
-      p.line(start.x, start.y, end.x, end.y);
+      p.point(v.x, v.y);
     }
 
-    p.stroke("purple");
-    p.strokeWeight(4);
+    p.stroke("gray");
 
-    for (const beat of this.analysis.beats) {
-      const t = this.findThetaPct(beat.progressPct);
-      const v = this.getPointVector(t);
+    for (const segment of this.analysis.segments) {
+      if (segment.confidence < 0.2) continue;
+
+      const t = this.findThetaPct(segment.progressPct);
+      const v = this.getPointVector(t, 5);
+
+      if (segment.progressPct > pct) {
+        p.strokeWeight(1);
+      } else {
+        p.strokeWeight(4);
+      }
 
       p.point(v.x, v.y);
     }
   }
 
-  private getPointVector(theta: number): Vector {
+  private pulse(p: p5, pct: number) {
+    const progressMs = pct * this.analysis.track.duration * 1000;
+
+    const distances = this.analysis.beats.map(({ startMs, confidence }) => {
+      const dist = startMs - progressMs;
+      const absDist = Math.abs(dist);
+
+      return { dist, absDist, confidence };
+    });
+
+    distances.sort((a, b) => a.absDist - b.absDist);
+
+    const closest = distances[0];
+
+    p.scale(this.bump(closest.dist, closest.confidence));
+  }
+
+  private bump(x: number, confidence: number) {
+    const f = (t: number) => (t <= 0 ? 0 : Math.pow(Math.E, -1 / t));
+    const g = (t: number) => f(t) / (f(t) + f(1 - t));
+    const h = (t: number) => g(t + 0.1);
+    const k = (t: number) => h(Math.pow(t, 2));
+    const p = (t: number) => 0.01 * (1 - k(t));
+    const o = (t: number) => p(t / 150) + 1;
+
+    const scaleUp = (o(x) - 1) * confidence;
+
+    return 1 + scaleUp;
+  }
+
+  private getCurrentSectionColor(theta: number) {
+    const progressPct = this.getProgressPct(theta);
+
+    const step = 255 / this.analysis.sections.length;
+
+    for (let i = 0; i < this.analysis.sections.length; i++) {
+      const section = this.analysis.sections[i];
+
+      if (
+        progressPct > section.startProgressPct &&
+        progressPct < section.endProgressPct
+      ) {
+        return (i + 1) * step;
+      }
+    }
+    return 0;
+  }
+
+  private getProgressPct(theta: number) {
+    return (this.arcLength(theta) - this.arcLengthStart) / this.totalArcLength;
+  }
+
+  private getPointVector(theta: number, offset: number = 0): Vector {
     const v = new Vector();
     v.set(Math.cos(theta), Math.sin(theta));
-    v.mult(this.getDistance(theta));
+    v.mult(this.getDistance(theta) + offset);
 
     return v;
   }
