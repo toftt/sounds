@@ -19,7 +19,7 @@ interface RecordOptions {
 
 export class Record {
   private static readonly THETA_DELTA_MAX: number = (2 * Math.PI) / 180;
-  private static readonly PRECISION: number = 20;
+  private static readonly PRECISION: number = 80;
   private static readonly DEFAULT_OPTIONS = {
     a: 1,
     b: Math.PI,
@@ -62,6 +62,20 @@ export class Record {
     console.log(this);
   }
 
+  /**
+   * TOMORROW:
+   *
+   * Name of song in middle?
+   * Automatic reauth if request fails, or token expired
+   * Display "Play something on Spotify..." if nothing is playing
+   * Refetch the play state every few seconds
+   * Figure out some colors for the lines?
+   * (performance) Use binary search for the pulse function
+   * Add background?
+   * Ask #wasp to remove dev mode on the app.
+   * Deploy to Github pages
+   *
+   */
   public drawPct(p: p5, pct: number) {
     this.pulse(p, pct);
 
@@ -69,8 +83,12 @@ export class Record {
     // p.rotate(pct * Math.PI * 64);
     p.background("white");
 
-    p.strokeWeight(1);
+    p.strokeWeight(2);
+    p.stroke(200, 200, 200);
+    p.circle(0, 0, this.getDistance(this.thetaEnd) * 2);
+    p.circle(0, 0, this.getDistance(this.thetaStart) * 2);
 
+    p.strokeWeight(1);
     let theta = this.thetaStart;
     while (theta < this.thetaEnd) {
       const start = this.getPointVector(theta);

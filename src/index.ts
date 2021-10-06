@@ -91,6 +91,7 @@ const main = async () => {
     p.setup = () => {
       p.createCanvas(C_WIDTH, C_HEIGHT);
       p.colorMode(p.RGB);
+      p.frameRate(60);
     };
 
     p.draw = () => {
