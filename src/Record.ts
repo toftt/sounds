@@ -1,6 +1,7 @@
 import p5, { Vector } from "p5";
 import {
   AudioAnalysis,
+  AudioFeatures,
   processRawAnalysis,
   RawAudioAnalysis,
 } from "./AudioAnalysis";
@@ -38,7 +39,11 @@ export class Record {
 
   private scale: number = 1;
 
-  constructor(analysis: RawAudioAnalysis, options: RecordOptions = {}) {
+  constructor(
+    analysis: RawAudioAnalysis,
+    features: AudioFeatures,
+    options: RecordOptions = {}
+  ) {
     const { a, b, thetaStart, rotations } = {
       ...Record.DEFAULT_OPTIONS,
       ...options,
@@ -47,7 +52,7 @@ export class Record {
     this.a = a;
     this.b = b;
     this.thetaStart = thetaStart;
-    this.analysis = processRawAnalysis(analysis);
+    this.analysis = processRawAnalysis(analysis, features);
 
     this.thetaEnd = rotations * 2 * Math.PI;
     this.arcLengthStart = this.arcLength(this.thetaStart);
@@ -61,6 +66,7 @@ export class Record {
     this.pulse(p, pct);
 
     p.rotate(pct * Math.PI * 4);
+    // p.rotate(pct * Math.PI * 64);
     p.background("white");
 
     p.strokeWeight(1);
@@ -72,8 +78,9 @@ export class Record {
 
       const end = this.getPointVector(theta);
 
-      const sectionColor = this.getCurrentSectionColor(theta);
-      p.stroke(sectionColor, 150, 150);
+      // const sectionColor = this.getCurrentSectionColor(theta);
+      // p.stroke(sectionColor, 150, 150);
+      p.stroke(200, 200, 200);
 
       if (this.getProgressPct(theta) > pct) {
         p.strokeWeight(1);
@@ -83,7 +90,6 @@ export class Record {
       p.line(start.x, start.y, end.x, end.y);
     }
 
-    theta = this.thetaStart;
     p.strokeWeight(5);
     p.stroke("gray");
 
@@ -143,10 +149,15 @@ export class Record {
       const t = this.findThetaPct(segment.progressPct);
       const v = this.getPointVector(t, segment.avgPitch);
 
+      p.stroke(
+        segment.color.red(),
+        segment.color.green(),
+        segment.color.blue()
+      );
       if (segment.progressPct > pct) {
         p.strokeWeight(2);
       } else {
-        p.strokeWeight(5);
+        p.strokeWeight(4 * segment.relativeLoudness);
       }
 
       p.point(v.x, v.y);
@@ -167,7 +178,7 @@ export class Record {
 
     const closest = distances[0];
 
-    p.scale(this.bump(closest.dist, closest.confidence));
+    p.scale(this.bump(closest.dist, closest.confidence) + 0.4);
   }
 
   private bump(x: number, confidence: number) {
