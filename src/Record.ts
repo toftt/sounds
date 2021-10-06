@@ -53,21 +53,19 @@ export class Record {
     this.arcLengthStart = this.arcLength(this.thetaStart);
     this.arcLengthEnd = this.arcLength(this.thetaEnd);
     this.totalArcLength = this.arcLengthEnd - this.arcLengthStart;
+
+    console.log(this);
   }
 
   public drawPct(p: p5, pct: number) {
     this.pulse(p, pct);
-    let theta = this.thetaStart;
 
     p.rotate(pct * Math.PI * 4);
     p.background("white");
 
-    // p.strokeWeight(10);
-    // p.stroke(this.getCurrentSectionColor(this.thetaStart * Math.PI));
-    // const dist = this.getDistance(this.thetaStart + 8 * Math.PI);
-    // p.circle(0, 0, dist);
-
     p.strokeWeight(1);
+
+    let theta = this.thetaStart;
     while (theta < this.thetaEnd) {
       const start = this.getPointVector(theta);
       theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
@@ -80,53 +78,75 @@ export class Record {
       if (this.getProgressPct(theta) > pct) {
         p.strokeWeight(1);
       } else {
-        p.strokeWeight(10);
+        p.strokeWeight(2);
       }
       p.line(start.x, start.y, end.x, end.y);
     }
 
-    p.stroke("black");
-    p.strokeWeight(4);
+    theta = this.thetaStart;
+    p.strokeWeight(5);
+    p.stroke("gray");
 
-    for (const beat of this.analysis.beats) {
-      const t = this.findThetaPct(beat.progressPct);
-      const v = this.getPointVector(t);
+    const [curSeg, nextSeg, t] = this.findBounds(pct);
 
-      if (beat.progressPct > pct) {
-        p.strokeWeight(4);
-      } else {
-        p.strokeWeight(8);
-      }
+    const t1 = this.findThetaPct(curSeg.progressPct);
+    const t2 = this.findThetaPct(nextSeg.progressPct);
 
-      p.point(v.x, v.y);
+    const v1 = this.getPointVector(t1, curSeg.avgPitch);
+    const v2 = this.getPointVector(t2, nextSeg.avgPitch);
+
+    const lerped = Vector.lerp(v1, v2, t);
+
+    const lerpedT = p.lerp(t1, t2, t);
+    if (lerped.mag() > this.getDistance(lerpedT)) {
+      p.point(lerped.x, lerped.y);
+    } else {
+      const vv = this.getPointVector(lerpedT);
+      p.point(vv.x, vv.y);
     }
 
-    p.stroke("white");
-    for (const bar of this.analysis.bars) {
-      const t = this.findThetaPct(bar.progressPct);
-      const v = this.getPointVector(t);
+    // p.stroke("black");
+    // p.strokeWeight(4);
 
-      if (bar.progressPct > pct) {
-        p.strokeWeight(2);
-      } else {
-        p.strokeWeight(5);
-      }
+    // for (const beat of this.analysis.beats) {
+    //   const t = this.findThetaPct(beat.progressPct);
+    //   const v = this.getPointVector(t);
 
-      p.point(v.x, v.y);
-    }
+    //   if (beat.progressPct > pct) {
+    //     p.strokeWeight(4);
+    //   } else {
+    //     p.strokeWeight(8);
+    //   }
+
+    //   p.point(v.x, v.y);
+    // }
+
+    // p.stroke("white");
+    // for (const bar of this.analysis.bars) {
+    //   const t = this.findThetaPct(bar.progressPct);
+    //   const v = this.getPointVector(t);
+
+    //   if (bar.progressPct > pct) {
+    //     p.strokeWeight(2);
+    //   } else {
+    //     p.strokeWeight(5);
+    //   }
+
+    //   p.point(v.x, v.y);
+    // }
 
     p.stroke("gray");
 
     for (const segment of this.analysis.segments) {
-      if (segment.confidence < 0.2) continue;
+      // if (segment.confidence < 0.2) continue;
 
       const t = this.findThetaPct(segment.progressPct);
-      const v = this.getPointVector(t, 5);
+      const v = this.getPointVector(t, segment.avgPitch);
 
       if (segment.progressPct > pct) {
-        p.strokeWeight(1);
+        p.strokeWeight(2);
       } else {
-        p.strokeWeight(4);
+        p.strokeWeight(5);
       }
 
       p.point(v.x, v.y);
@@ -246,5 +266,48 @@ export class Record {
       }
     }
     return t;
+  }
+
+  findBounds(progressPct: number) {
+    const { segments } = this.analysis;
+    const lastSegment = segments[segments.length - 1];
+
+    if (lastSegment.progressPct < progressPct) {
+      return <const>[lastSegment, lastSegment, 0.5];
+    }
+
+    let lo = 0;
+    let hi = segments.length;
+
+    let mid = Math.floor(hi / 2);
+
+    for (let i = 0; i < 10_000; i++) {
+      const cur = segments[mid];
+      const next = segments[mid + 1];
+
+      if (progressPct >= cur.progressPct && progressPct < next.progressPct) {
+        const interval = next.startMs - cur.startMs;
+        const pro =
+          this.analysis.track.duration * 1000 * progressPct - cur.startMs;
+        const t = pro / interval;
+
+        return <const>[cur, next, t];
+      }
+
+      if (progressPct < cur.progressPct) {
+        hi = mid;
+
+        const interval = hi - lo;
+        mid = lo + Math.floor(interval / 2);
+      } else {
+        lo = mid;
+
+        const interval = hi - lo;
+        mid = lo + Math.floor(interval / 2);
+      }
+    }
+
+    console.log(progressPct);
+    throw new Error("couldnt find thing");
   }
 }

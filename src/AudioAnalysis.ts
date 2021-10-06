@@ -89,7 +89,13 @@ export interface AudioAnalysis extends RawAudioAnalysis {
       endProgressPct: number;
     }
   >;
-  segments: Array<RawAudioAnalysis["segments"][0] & { progressPct: number }>;
+  segments: Array<
+    RawAudioAnalysis["segments"][0] & {
+      startMs: number;
+      progressPct: number;
+      avgPitch: number;
+    }
+  >;
   track: RawAudioAnalysis["track"] & { beatTimingsMs: number[] };
 }
 
@@ -111,10 +117,24 @@ const processBars = (analysis: RawAudioAnalysis): AudioAnalysis["bars"] => {
 const processSegments = (
   analysis: RawAudioAnalysis
 ): AudioAnalysis["segments"] => {
-  return analysis.segments.map((segment) => ({
-    ...segment,
-    progressPct: segment.start / analysis.track.duration,
-  }));
+  return analysis.segments.map((segment) => {
+    const pitch = segment.pitches.reduce(
+      (acc, pitch, idx) => {
+        if (pitch > acc.conf) {
+          return { conf: pitch, i: idx };
+        }
+        return acc;
+      },
+      { conf: 0, i: 0 }
+    );
+
+    return {
+      ...segment,
+      avgPitch: pitch.i,
+      progressPct: segment.start / analysis.track.duration,
+      startMs: segment.start * 1000,
+    };
+  });
 };
 
 const processSections = (
