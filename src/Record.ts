@@ -1,4 +1,4 @@
-import p5, { Vector } from "p5";
+import p5, { Vector, Graphics } from "p5";
 import {
   AudioAnalysis,
   AudioFeatures,
@@ -20,6 +20,7 @@ interface RecordOptions {
 export class Record {
   private static readonly THETA_DELTA_MAX: number = (2 * Math.PI) / 180;
   private static readonly PRECISION: number = 80;
+  private static readonly BUFFER_SECTIONS: number = 10;
   private static readonly DEFAULT_OPTIONS = {
     a: 1,
     b: Math.PI,
@@ -39,7 +40,12 @@ export class Record {
 
   private scale: number = 1;
 
+  /** pre-buffered graphics */
+  private readonly spiralBuffer: Graphics;
+  private readonly spiralBufferSecions: Graphics[];
+
   constructor(
+    p: p5,
     analysis: RawAudioAnalysis,
     features: AudioFeatures,
     options: RecordOptions = {}
@@ -59,6 +65,9 @@ export class Record {
     this.arcLengthEnd = this.arcLength(this.thetaEnd);
     this.totalArcLength = this.arcLengthEnd - this.arcLengthStart;
 
+    this.spiralBuffer = this.createSpiralBuffer(p);
+    this.spiralBufferSecions = this.createSpiralSecions(p);
+
     console.log(this);
   }
 
@@ -77,20 +86,48 @@ export class Record {
    *
    */
   public drawPct(p: p5, pct: number) {
+    const currentPart = Math.floor(pct * Record.BUFFER_SECTIONS);
     this.pulse(p, pct);
 
     p.rotate(pct * Math.PI * 4);
-    // p.rotate(pct * Math.PI * 64);
     p.background("white");
 
-    p.strokeWeight(2);
-    p.stroke(200, 200, 200);
-    p.circle(0, 0, this.getDistance(this.thetaEnd) * 2);
-    p.circle(0, 0, this.getDistance(this.thetaStart) * 2);
+    // draw spiral background
+    p.image(this.spiralBuffer, -600, -600);
 
-    p.strokeWeight(1);
-    let theta = this.thetaStart;
-    while (theta < this.thetaEnd) {
+    for (let i = 0; i < currentPart; i++) {
+      p.image(this.spiralBufferSecions[i], -600, -600);
+    }
+
+    // p.strokeWeight(2);
+    // let theta = this.thetaStart;
+    // while (theta < this.thetaEnd) {
+    //   const start = this.getPointVector(theta);
+    //   theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
+
+    //   const end = this.getPointVector(theta);
+
+    //   // const sectionColor = this.getCurrentSectionColor(theta);
+    //   // p.stroke(sectionColor, 150, 150);
+    //   p.stroke(200, 200, 200);
+
+    //   if (this.getProgressPct(theta) < pct) {
+    //     p.line(start.x, start.y, end.x, end.y);
+    //   }
+    // }
+
+    // divide song in 10 parts (0-9)
+    const part = Math.floor(pct * 10);
+    const partArcLength = this.totalArcLength / 10;
+    const partArcStart = this.arcLengthStart + partArcLength * part;
+    const partArcEnd = partArcStart + partArcLength;
+
+    const partThetaStart = this.findTheta(partArcStart);
+    const partThetaEnd = this.findTheta(partArcEnd);
+
+    p.strokeWeight(2);
+    let theta = partThetaStart;
+    while (theta < partThetaEnd) {
       const start = this.getPointVector(theta);
       theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
 
@@ -100,12 +137,9 @@ export class Record {
       // p.stroke(sectionColor, 150, 150);
       p.stroke(200, 200, 200);
 
-      if (this.getProgressPct(theta) > pct) {
-        p.strokeWeight(1);
-      } else {
-        p.strokeWeight(2);
+      if (this.getProgressPct(theta) < pct) {
+        p.line(start.x, start.y, end.x, end.y);
       }
-      p.line(start.x, start.y, end.x, end.y);
     }
 
     p.strokeWeight(5);
@@ -159,7 +193,7 @@ export class Record {
     //   p.point(v.x, v.y);
     // }
 
-    p.stroke("gray");
+    // p.stroke("gray");
 
     for (const segment of this.analysis.segments) {
       // if (segment.confidence < 0.2) continue;
@@ -182,6 +216,60 @@ export class Record {
     }
   }
 
+  private createSpiralSecions(p: p5) {
+    const spiralSecions: Graphics[] = [];
+
+    for (let part = 0; part < Record.BUFFER_SECTIONS; part++) {
+      const partArcLength = this.totalArcLength / Record.BUFFER_SECTIONS;
+      const partArcStart = this.arcLengthStart + partArcLength * part;
+      const partArcEnd = partArcStart + partArcLength;
+
+      const partThetaEnd = this.findTheta(partArcEnd);
+
+      const g = p.createGraphics(1200, 1200);
+      g.translate(600, 600);
+
+      g.strokeWeight(2);
+      let theta = this.thetaStart;
+      while (theta < partThetaEnd) {
+        const start = this.getPointVector(theta);
+        theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
+
+        const end = this.getPointVector(theta);
+
+        g.stroke(200, 200, 200);
+
+        g.line(start.x, start.y, end.x, end.y);
+      }
+      spiralSecions.push(g);
+    }
+
+    return spiralSecions;
+  }
+
+  private createSpiralBuffer(p: p5) {
+    const g = p.createGraphics(1200, 1200);
+    // TODO: remove hard coded width/height
+    g.translate(600, 600);
+
+    g.strokeWeight(2);
+    g.stroke(200, 200, 200);
+    g.circle(0, 0, this.getDistance(this.thetaEnd) * 2);
+    g.circle(0, 0, this.getDistance(this.thetaStart) * 2);
+
+    g.strokeWeight(1);
+    let theta = this.thetaStart;
+    while (theta < this.thetaEnd) {
+      const start = this.getPointVector(theta);
+      theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
+
+      const end = this.getPointVector(theta);
+      g.stroke(200, 200, 200);
+      g.line(start.x, start.y, end.x, end.y);
+    }
+    return g;
+  }
+
   private pulse(p: p5, pct: number) {
     const progressMs = pct * this.analysis.track.duration * 1000;
 
@@ -196,7 +284,7 @@ export class Record {
 
     const closest = distances[0];
 
-    p.scale(this.bump(closest.dist, closest.confidence) + 0.4);
+    p.scale(this.bump(closest.dist, closest.confidence) + 0.2);
   }
 
   private bump(x: number, confidence: number) {

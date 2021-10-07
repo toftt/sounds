@@ -48,6 +48,7 @@ const getProgress = async (token: string) => {
   const { data } = await axios.get<{
     progress_ms: number;
     item: { duration_ms: number; uri: string };
+    timestamp: number;
   }>("https://api.spotify.com/v1/me/player/currently-playing", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -59,6 +60,7 @@ const getProgress = async (token: string) => {
     progressMs: data.progress_ms,
     durationMs: data.item.duration_ms,
     uri: data.item.uri,
+    timestamp: data.timestamp,
   };
 };
 
@@ -77,16 +79,27 @@ const main = async () => {
   // );
   await wait(200);
 
-  const { progressMs, durationMs, uri } = await getProgress(token);
+  const { progressMs, durationMs, uri, timestamp } = await getProgress(token);
 
   const startTimestamp = new Date().getTime();
+  console.log(timestamp - progressMs);
+  console.log(startTimestamp);
 
   let progressPct = (progressMs + 20) / durationMs;
+
+  const frameRateContainer = document.getElementById("frame-rate");
+  let frameRate = "0";
+
+  setInterval(() => {
+    if (frameRateContainer) {
+      frameRateContainer.textContent = `${frameRate}`;
+    }
+  }, 1000);
 
   const analysis = await getAnalysis(token, uri);
   const features = await getFeatures(token, uri);
   const sketch = (p: p5) => {
-    const rec = new Record(analysis, features);
+    const rec = new Record(p, analysis, features);
 
     p.setup = () => {
       p.createCanvas(C_WIDTH, C_HEIGHT);
@@ -95,6 +108,8 @@ const main = async () => {
     };
 
     p.draw = () => {
+      frameRate = p.frameRate().toFixed(1);
+
       const now = new Date().getTime();
       const diff = now - startTimestamp;
 
