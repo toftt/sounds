@@ -38,9 +38,16 @@ const getFeatures = async (token: string, uri: string) => {
   return data;
 };
 
-const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
+interface Progress {
+  progressMs: number;
+  durationMs: number;
+  uri: string;
+  timestamp: number;
+}
+
+// const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const getProgress = async (token: string) => {
-  const { data } = await axios.get<{
+  const response = await axios.get<{
     progress_ms: number;
     item: { duration_ms: number; uri: string };
     timestamp: number;
@@ -50,7 +57,11 @@ const getProgress = async (token: string) => {
     },
   });
 
-  console.log(data);
+  if (response.status === 204) {
+    return null;
+  }
+
+  const { data } = response;
   return {
     progressMs: data.progress_ms,
     durationMs: data.item.duration_ms,
@@ -72,15 +83,31 @@ const main = async () => {
   //   },
   //   { headers: { Authorization: `Bearer ${token}` } }
   // );
-  await wait(200);
+  // await wait(200);
 
-  const { progressMs, durationMs, uri, timestamp } = await getProgress(token);
+  let progress = await getProgress(token);
+  console.log({ progress });
 
+  if (progress) {
+    startScene(progress, token);
+  } else {
+    waitingToPlay();
+    const intervalId = setInterval(async () => {
+      progress = await getProgress(token);
+      if (progress) {
+        const waitTextEl = document.getElementById("wait-text");
+        waitTextEl?.remove();
+        startScene(progress, token);
+        clearInterval(intervalId);
+      }
+    }, 5_000);
+  }
+};
+
+const startScene = async (progress: Progress, token: string) => {
   const startTimestamp = new Date().getTime();
-  console.log(timestamp - progressMs);
-  console.log(startTimestamp);
 
-  let progressPct = (progressMs + 20) / durationMs;
+  let progressPct = (progress.progressMs + 20) / progress.durationMs;
 
   const frameRateContainer = document.getElementById("frame-rate");
   let frameRate = "0";
@@ -91,8 +118,8 @@ const main = async () => {
     }
   }, 1000);
 
-  const analysis = await getAnalysis(token, uri);
-  const features = await getFeatures(token, uri);
+  const analysis = await getAnalysis(token, progress.uri);
+  const features = await getFeatures(token, progress.uri);
   const sketch = (p: p5) => {
     const rec = new Record(p, analysis, features);
 
@@ -108,7 +135,7 @@ const main = async () => {
       const now = new Date().getTime();
       const diff = now - startTimestamp;
 
-      progressPct = (progressMs + diff) / durationMs;
+      progressPct = (progress.progressMs + diff) / progress.durationMs;
 
       p.translate(C_WIDTH / 2, C_HEIGHT / 2);
       rec.drawPct(p, progressPct);
@@ -146,4 +173,11 @@ function drawColorPalette(features: AudioFeatures) {
 
     colorSamplesContainer?.appendChild(div);
   }
+}
+
+function waitingToPlay() {
+  const div = document.createElement("div");
+  div.textContent = "Start playing a track in Spotify to get started...";
+  div.id = "wait-text";
+  containerElement?.appendChild(div);
 }
