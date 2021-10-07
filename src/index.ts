@@ -2,8 +2,6 @@ import p5 from "p5";
 import axios from "axios";
 import { getWebApiToken } from "./auth";
 import { Record } from "./Record";
-import ado from "./songs/ado.json";
-import industry from "./songs/industry.json";
 import { AudioFeatures, RawAudioAnalysis } from "./AudioAnalysis";
 import { ColorPalette } from "./ColorPalette";
 
@@ -11,9 +9,6 @@ const containerElement = document.getElementById("p5-container") ?? undefined;
 
 const C_WIDTH = 1200;
 const C_HEIGHT = 1200;
-
-const ELLIOT = "spotify:track:0Ziohm1Ku8E2yUDYoclfhO";
-const ADO = "spotify:track:7z6qHGEKxRtwtYym2epV7l";
 
 const getAnalysis = async (token: string, uri: string) => {
   const id = uri.split(":")[2];

@@ -3,7 +3,6 @@ import * as webpack from "webpack";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 
 const config: webpack.Configuration = {
-  mode: "development",
   entry: "./src/index.ts",
   module: {
     rules: [
@@ -26,6 +25,7 @@ const config: webpack.Configuration = {
   output: {
     path: path.resolve(__dirname, "dist"),
     filename: "[contenthash].bundle.js",
+    clean: true,
   },
 };
 
