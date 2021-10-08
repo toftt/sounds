@@ -86,17 +86,14 @@ export class Record {
   }
 
   /**
-   * TOMORROW:
+   * TODO:
    *
    * Name of song in middle?
-   * Automatic reauth if request fails, or token expired
-   * Display "Play something on Spotify..." if nothing is playing
    * Refetch the play state every few seconds
    * Figure out some colors for the lines?
    * (performance) Use binary search for the pulse function
    * Add background?
-   * Ask #wasp to remove dev mode on the app.
-   * Deploy to Github pages
+   * Dynamic canvas size
    *
    */
   public drawPct(p: p5, pct: number) {

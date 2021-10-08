@@ -1,89 +1,18 @@
 import p5 from "p5";
-import axios from "axios";
 import { getWebApiToken } from "./auth";
 import { Record } from "./Record";
-import { AudioFeatures, RawAudioAnalysis } from "./AudioAnalysis";
+import { AudioFeatures } from "./AudioAnalysis";
 import { ColorPalette } from "./ColorPalette";
+import { getAnalysis, getFeatures, getProgress, PlaybackState } from "./api";
+import { Scene } from "./Scene";
 
 const containerElement = document.getElementById("p5-container") ?? undefined;
 
 const C_WIDTH = 1200;
 const C_HEIGHT = 1200;
 
-const getAnalysis = async (token: string, uri: string) => {
-  const id = uri.split(":")[2];
-  const { data } = await axios.get<RawAudioAnalysis>(
-    `https://api.spotify.com/v1/audio-analysis/${id}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  return data;
-};
-
-const getFeatures = async (token: string, uri: string) => {
-  const id = uri.split(":")[2];
-  const { data } = await axios.get<AudioFeatures>(
-    `https://api.spotify.com/v1/audio-features/${id}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  return data;
-};
-
-interface Progress {
-  progressMs: number;
-  durationMs: number;
-  uri: string;
-  timestamp: number;
-}
-
-// const wait = (ms: number) => new Promise((res) => setTimeout(res, ms));
-const getProgress = async (token: string) => {
-  const response = await axios.get<{
-    progress_ms: number;
-    item: { duration_ms: number; uri: string };
-    timestamp: number;
-  }>("https://api.spotify.com/v1/me/player/currently-playing", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const { data } = response;
-  return {
-    progressMs: data.progress_ms,
-    durationMs: data.item.duration_ms,
-    uri: data.item.uri,
-    timestamp: data.timestamp,
-  };
-};
-
 const main = async () => {
   const token = await getWebApiToken();
-
-  // const uri = ELLIOT;
-  // const analysis = await getAnalysis(token, uri);
-
-  // await axios.put(
-  //   "https://api.spotify.com/v1/me/player/play",
-  //   {
-  //     uris: [uri],
-  //   },
-  //   { headers: { Authorization: `Bearer ${token}` } }
-  // );
-  // await wait(200);
 
   let progress = await getProgress(token);
   console.log({ progress });
@@ -104,7 +33,7 @@ const main = async () => {
   }
 };
 
-const startScene = async (progress: Progress, token: string) => {
+const startScene = async (progress: PlaybackState, token: string) => {
   const startTimestamp = new Date().getTime();
 
   let progressPct = (progress.progressMs + 20) / progress.durationMs;
@@ -141,11 +70,11 @@ const startScene = async (progress: Progress, token: string) => {
     };
   };
 
-  new p5(sketch, containerElement);
+  const p5Instance = new p5(sketch, containerElement);
   drawColorPalette(features);
 };
 
-main();
+// main();
 
 function drawColorPalette(features: AudioFeatures) {
   const colPal = new ColorPalette(features);
@@ -180,3 +109,10 @@ function waitingToPlay() {
   div.id = "wait-text";
   containerElement?.appendChild(div);
 }
+
+async function main2() {
+  const token = await getWebApiToken();
+  new Scene(token);
+}
+
+main2();
