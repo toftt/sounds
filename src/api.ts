@@ -7,6 +7,8 @@ export interface PlaybackState {
   isPlaying: boolean;
   uri: string;
   timestamp: number;
+  trackName: string;
+  artist: string;
 }
 
 export const getProgress = async (
@@ -14,7 +16,12 @@ export const getProgress = async (
 ): Promise<PlaybackState | null> => {
   const response = await axios.get<{
     progress_ms: number;
-    item: { duration_ms: number; uri: string };
+    item: {
+      duration_ms: number;
+      uri: string;
+      name: string;
+      artists: { name: string }[];
+    };
     timestamp: number;
     is_playing: boolean;
   }>("https://api.spotify.com/v1/me/player/currently-playing", {
@@ -34,6 +41,8 @@ export const getProgress = async (
     uri: data.item.uri,
     timestamp: data.timestamp,
     isPlaying: data.is_playing,
+    trackName: data.item.name,
+    artist: data.item.artists[0].name,
   };
 };
 

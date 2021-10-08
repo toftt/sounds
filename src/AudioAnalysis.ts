@@ -125,6 +125,7 @@ export interface AudioAnalysis extends RawAudioAnalysis {
     }
   >;
   track: RawAudioAnalysis["track"] & { beatTimingsMs: number[] };
+  colorPalette: ColorPalette;
 }
 
 const processBeats = (analysis: RawAudioAnalysis): AudioAnalysis["beats"] => {
@@ -225,5 +226,6 @@ export const processRawAnalysis = (
     sections: processSections(analysis, colorPalette),
     segments: processSegments(analysis, colorPalette),
     track: processTrack(analysis),
+    colorPalette,
   };
 };

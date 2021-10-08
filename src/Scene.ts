@@ -2,9 +2,6 @@ import p5 from "p5";
 import { getAnalysis, getFeatures, getProgress, PlaybackState } from "./api";
 import { Record } from "./Record";
 
-const C_WIDTH = 1200;
-const C_HEIGHT = 1200;
-
 export class Scene {
   private static P5_CONTAINER_NAME = "p5-container";
 
@@ -73,11 +70,31 @@ export class Scene {
     const features = await getFeatures(this.authToken, this.playbackState.uri);
 
     const sketch = (p: p5) => {
-      const rec = new Record(p, analysis, features);
+      let rec: Record;
 
       p.setup = () => {
-        p.createCanvas(C_WIDTH, C_HEIGHT);
+        p.createCanvas(
+          this.p5ContainerEl.clientWidth,
+          this.p5ContainerEl.clientHeight
+        );
         p.colorMode(p.RGB);
+
+        rec = new Record(
+          p,
+          {
+            name: this.playbackState?.trackName ?? "",
+            artist: this.playbackState?.artist ?? "",
+          },
+          analysis,
+          features
+        );
+      };
+
+      p.windowResized = () => {
+        const w = this.p5ContainerEl.clientWidth;
+        const h = this.p5ContainerEl.clientHeight;
+        p.resizeCanvas(w, h);
+        rec.prerender(p);
       };
 
       p.draw = () => {
@@ -89,8 +106,6 @@ export class Scene {
             (this.playbackState.progressMs + diff + 20) /
             this.playbackState.durationMs;
         }
-
-        p.translate(C_WIDTH / 2, C_HEIGHT / 2);
         rec.drawPct(p, progressPct);
       };
     };
