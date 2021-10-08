@@ -41,8 +41,8 @@ export class Record {
   private scale: number = 1;
 
   /** pre-buffered graphics */
-  private readonly spiralBuffer: Graphics;
-  private readonly spiralBufferSecions: Graphics[];
+  private readonly fixedBuffer: Graphics;
+  private readonly sectionBuffers: Graphics[];
 
   constructor(
     p: p5,
@@ -65,8 +65,22 @@ export class Record {
     this.arcLengthEnd = this.arcLength(this.thetaEnd);
     this.totalArcLength = this.arcLengthEnd - this.arcLengthStart;
 
-    this.spiralBuffer = this.createSpiralBuffer(p);
-    this.spiralBufferSecions = this.createSpiralSecions(p);
+    this.fixedBuffer = p.createGraphics(1200, 1200);
+    this.fixedBuffer.translate(600, 600);
+
+    this.prerenderSpiral(this.fixedBuffer);
+    this.prerenderFixedSegments(this.fixedBuffer);
+
+    this.sectionBuffers = [];
+    for (let part = 0; part < Record.BUFFER_SECTIONS; part++) {
+      const g = p.createGraphics(1200, 1200);
+      g.translate(600, 600);
+
+      this.prerenderSpiralSection(g, part);
+      this.prerenderSegmentsForPart(g, part);
+
+      this.sectionBuffers.push(g);
+    }
 
     console.log(this);
   }
@@ -93,32 +107,15 @@ export class Record {
     p.background("white");
 
     // draw spiral background
-    p.image(this.spiralBuffer, -600, -600);
+    p.image(this.fixedBuffer, -600, -600);
 
     for (let i = 0; i < currentPart; i++) {
-      p.image(this.spiralBufferSecions[i], -600, -600);
+      p.image(this.sectionBuffers[i], -600, -600);
     }
 
-    // p.strokeWeight(2);
-    // let theta = this.thetaStart;
-    // while (theta < this.thetaEnd) {
-    //   const start = this.getPointVector(theta);
-    //   theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
-
-    //   const end = this.getPointVector(theta);
-
-    //   // const sectionColor = this.getCurrentSectionColor(theta);
-    //   // p.stroke(sectionColor, 150, 150);
-    //   p.stroke(200, 200, 200);
-
-    //   if (this.getProgressPct(theta) < pct) {
-    //     p.line(start.x, start.y, end.x, end.y);
-    //   }
-    // }
-
     // divide song in 10 parts (0-9)
-    const part = Math.floor(pct * 10);
-    const partArcLength = this.totalArcLength / 10;
+    const part = Math.floor(pct * Record.BUFFER_SECTIONS);
+    const partArcLength = this.totalArcLength / Record.BUFFER_SECTIONS;
     const partArcStart = this.arcLengthStart + partArcLength * part;
     const partArcEnd = partArcStart + partArcLength;
 
@@ -163,6 +160,26 @@ export class Record {
       p.point(vv.x, vv.y);
     }
 
+    // draw segments
+    const partPctLength = 1 / Record.BUFFER_SECTIONS;
+    const pctStart = part * partPctLength;
+
+    for (const segment of this.analysis.segments) {
+      if (segment.progressPct < pctStart) continue;
+      if (segment.progressPct > pct) break;
+
+      const t = this.findThetaPct(segment.progressPct);
+      const v = this.getPointVector(t, segment.avgPitch);
+
+      p.stroke(
+        segment.color.red(),
+        segment.color.green(),
+        segment.color.blue()
+      );
+      p.strokeWeight(4 * segment.relativeLoudness);
+      p.point(v.x, v.y);
+    }
+
     // p.stroke("black");
     // p.strokeWeight(4);
 
@@ -194,64 +211,68 @@ export class Record {
     // }
 
     // p.stroke("gray");
+  }
 
+  private prerenderSegmentsForPart(g: Graphics, part: number) {
+    const partPctLength = 1 / Record.BUFFER_SECTIONS;
+    const pctStop = part * partPctLength + partPctLength;
+
+    for (const segment of this.analysis.segments) {
+      if (segment.progressPct > pctStop) break;
+
+      const t = this.findThetaPct(segment.progressPct);
+      const v = this.getPointVector(t, segment.avgPitch);
+
+      g.stroke(
+        segment.color.red(),
+        segment.color.green(),
+        segment.color.blue()
+      );
+      g.strokeWeight(4 * segment.relativeLoudness);
+      g.point(v.x, v.y);
+    }
+  }
+
+  private prerenderFixedSegments(g: Graphics) {
     for (const segment of this.analysis.segments) {
       // if (segment.confidence < 0.2) continue;
 
       const t = this.findThetaPct(segment.progressPct);
       const v = this.getPointVector(t, segment.avgPitch);
 
-      p.stroke(
+      g.stroke(
         segment.color.red(),
         segment.color.green(),
         segment.color.blue()
       );
-      if (segment.progressPct > pct) {
-        p.strokeWeight(2);
-      } else {
-        p.strokeWeight(4 * segment.relativeLoudness);
-      }
-
-      p.point(v.x, v.y);
-    }
-  }
-
-  private createSpiralSecions(p: p5) {
-    const spiralSecions: Graphics[] = [];
-
-    for (let part = 0; part < Record.BUFFER_SECTIONS; part++) {
-      const partArcLength = this.totalArcLength / Record.BUFFER_SECTIONS;
-      const partArcStart = this.arcLengthStart + partArcLength * part;
-      const partArcEnd = partArcStart + partArcLength;
-
-      const partThetaEnd = this.findTheta(partArcEnd);
-
-      const g = p.createGraphics(1200, 1200);
-      g.translate(600, 600);
-
       g.strokeWeight(2);
-      let theta = this.thetaStart;
-      while (theta < partThetaEnd) {
-        const start = this.getPointVector(theta);
-        theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
 
-        const end = this.getPointVector(theta);
-
-        g.stroke(200, 200, 200);
-
-        g.line(start.x, start.y, end.x, end.y);
-      }
-      spiralSecions.push(g);
+      g.point(v.x, v.y);
     }
-
-    return spiralSecions;
   }
 
-  private createSpiralBuffer(p: p5) {
-    const g = p.createGraphics(1200, 1200);
-    // TODO: remove hard coded width/height
-    g.translate(600, 600);
+  private prerenderSpiralSection(g: Graphics, part: number) {
+    const partArcLength = this.totalArcLength / Record.BUFFER_SECTIONS;
+    const partArcStart = this.arcLengthStart + partArcLength * part;
+    const partArcEnd = partArcStart + partArcLength;
 
+    const partThetaEnd = this.findTheta(partArcEnd);
+
+    g.strokeWeight(2);
+    let theta = this.thetaStart;
+    while (theta < partThetaEnd) {
+      const start = this.getPointVector(theta);
+      theta += Math.min(Record.THETA_DELTA_MAX, this.thetaDelta(theta));
+
+      const end = this.getPointVector(theta);
+
+      g.stroke(200, 200, 200);
+
+      g.line(start.x, start.y, end.x, end.y);
+    }
+  }
+
+  private prerenderSpiral(g: Graphics) {
     g.strokeWeight(2);
     g.stroke(200, 200, 200);
     g.circle(0, 0, this.getDistance(this.thetaEnd) * 2);
@@ -267,7 +288,17 @@ export class Record {
       g.stroke(200, 200, 200);
       g.line(start.x, start.y, end.x, end.y);
     }
-    return g;
+  }
+
+  private getThetaForPart(part: number) {
+    const partArcLength = this.totalArcLength / Record.BUFFER_SECTIONS;
+    const partArcStart = this.arcLengthStart + partArcLength * part;
+    const partArcEnd = partArcStart + partArcLength;
+
+    const thetaStart = this.findTheta(partArcStart);
+    const thetaEnd = this.findTheta(partArcEnd);
+
+    return { thetaStart, thetaEnd };
   }
 
   private pulse(p: p5, pct: number) {
