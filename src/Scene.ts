@@ -30,6 +30,8 @@ export class Scene {
   }
 
   private async syncPlaybackState() {
+    if (document.visibilityState !== "visible") return;
+
     const prevPlaybackState = this.playbackState;
 
     this.playbackState = await getProgress(this.authToken);
@@ -82,7 +84,7 @@ export class Scene {
         const now = new Date().getTime();
         const diff = now - this.lastPlaybackUpdate;
 
-        if (this.playbackState) {
+        if (this.playbackState?.isPlaying) {
           progressPct =
             (this.playbackState.progressMs + diff) /
             this.playbackState.durationMs;

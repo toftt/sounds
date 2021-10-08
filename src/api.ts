@@ -4,6 +4,7 @@ import { AudioFeatures, RawAudioAnalysis } from "./AudioAnalysis";
 export interface PlaybackState {
   progressMs: number;
   durationMs: number;
+  isPlaying: boolean;
   uri: string;
   timestamp: number;
 }
@@ -15,6 +16,7 @@ export const getProgress = async (
     progress_ms: number;
     item: { duration_ms: number; uri: string };
     timestamp: number;
+    is_playing: boolean;
   }>("https://api.spotify.com/v1/me/player/currently-playing", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -31,6 +33,7 @@ export const getProgress = async (
     durationMs: data.item.duration_ms,
     uri: data.item.uri,
     timestamp: data.timestamp,
+    isPlaying: data.is_playing,
   };
 };
 
