@@ -12,11 +12,13 @@ export class Scene {
   private playbackState: PlaybackState | null;
   private lastPlaybackUpdate: number = new Date().getTime();
   private p5ContainerEl: HTMLElement;
+  private noPlaybackEl: HTMLElement;
   private authToken: string;
 
   constructor(authToken: string) {
     this.authToken = authToken;
     this.p5ContainerEl = document.getElementById(Scene.P5_CONTAINER_NAME)!;
+    this.noPlaybackEl = document.getElementById("no-playback")!;
 
     this.p5Instance = null;
     this.playbackState = null;
@@ -40,12 +42,14 @@ export class Scene {
 
     // user just started playback
     if (!prevPlaybackState && this.playbackState) {
+      this.noPlaybackEl.style.display = "none";
       this.start();
       return;
     }
     // user just stopped playback
     if (prevPlaybackState && !this.playbackState) {
       this.p5Instance?.remove();
+      this.noPlaybackEl.style.display = "block";
       return;
     }
 
