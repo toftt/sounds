@@ -86,7 +86,7 @@ export class Scene {
 
         if (this.playbackState?.isPlaying) {
           progressPct =
-            (this.playbackState.progressMs + diff) /
+            (this.playbackState.progressMs + diff + 20) /
             this.playbackState.durationMs;
         }
 
