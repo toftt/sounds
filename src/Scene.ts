@@ -21,7 +21,6 @@ export class Scene {
     this.playbackState = null;
 
     this.syncPlaybackState().then(() => {
-      console.log("he");
       setInterval(() => this.syncPlaybackState(), 5000);
     });
   }
