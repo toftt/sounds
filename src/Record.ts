@@ -200,7 +200,7 @@ export class Record {
         segment.color.green(),
         segment.color.blue()
       );
-      p.strokeWeight(Record.SEGMENT_STROKE_WIDTH * segment.relativeLoudness);
+      p.strokeWeight(this.getActiveSegmentStrokeWidth(segment));
       p.point(v.x, v.y);
     }
   }
@@ -284,7 +284,7 @@ export class Record {
         segment.color.green(),
         segment.color.blue()
       );
-      g.strokeWeight(Record.SEGMENT_STROKE_WIDTH * segment.relativeLoudness);
+      g.strokeWeight(this.getActiveSegmentStrokeWidth(segment));
       g.point(v.x, v.y);
     }
   }
@@ -375,6 +375,15 @@ export class Record {
       g.stroke(150, 150, 150);
       g.line(start.x, start.y, end.x, end.y);
     }
+  }
+
+  private getActiveSegmentStrokeWidth(segment: AudioAnalysis["segments"][0]) {
+    return (
+      Record.SEGMENT_STROKE_WIDTH *
+      segment.relativeLoudness *
+      segment.confidence *
+      1.2
+    );
   }
 
   /**
