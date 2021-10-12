@@ -73,6 +73,7 @@ export class Scene {
       let rec: Record;
 
       p.setup = () => {
+        p.pixelDensity(1);
         p.createCanvas(
           this.p5ContainerEl.clientWidth,
           this.p5ContainerEl.clientHeight
